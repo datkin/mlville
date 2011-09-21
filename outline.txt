@@ -1,0 +1,33 @@
+MLville will start as a simple compiler for a simple statically typed, higher
+order, ML-like language.
+
+The family of primitive types should be minimal: bytes, native ints, arrays,
+maybe floating point numbers. Type constructors will allow for variant and sum
+types -- recursive types might not be supported initially.
+
+Data mutation will (generally) be forbidden. Cyclic data may be created using a
+special self-referential binding construct (thus making self-reference
+explicit) a la 'let rec'. Side-effecting operations for IO will be allowed,
+thus the language may not be completely pure [1]. It will probably be desirable
+for the type system to allow for the identification of side-effecting and pure
+(side-effect free) code.
+
+The compiler could support backends to produce:
+ * ia32/x86 native code
+ * JVM bytecode
+ * Javascript
+ * MLville bytecode for a speculative JIT VM
+
+One fun benefit of multiple backends is that users have many ways to bootstrap
+a compiler for their system. For example, a simple HTML/JavaScript wrapper
+around the JavaScript-compiled compiler using the data URI scheme would allow
+users to compile and download a binary from a static page without a backing
+server [2].
+
+[1] Haskell gets around this with Monads. Reader methods, e.g. could return an
+input and a _new_ reader method, to preserve referential transparency. In
+Haskell, monadic IO allows each IO operation to be performed with the state of
+the world as an implicit input, and new state as implicit output.  The IO and
+State monads provide "proof by construction" of single-threading which is
+required to make side-effecting realistic in a pure langauge.
+[2] E.g.: data:application/octet-stream;charset=utf-8;base64,Zm9vIGJhcg==
