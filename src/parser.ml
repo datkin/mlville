@@ -27,6 +27,7 @@ open Core.Std;;
 
 type 'a stream = 'a list
 
+(* TODO: better names for Success/Fail result and accumulator result *)
 type ('a, 'b) result =
   | Success of 'b * 'a stream
   | Failure
@@ -110,95 +111,71 @@ module Tail = struct
   (* 'Z' for zipper. Perhaps 'F' would be better? *)
   type ('a, 'b) context =
     | Z_Seq of ('a, 'b) parser
-    | Z_Alt of ('a, 'b) parser * 'b
-    | Z_Bound of ('a, 'b) parser * int * int * int option * 'b
+    | Z_Alt of ('a, 'b) parser * 'b * 'a stream
+    | Z_Bound of ('a, 'b) parser * int * int * int option * 'b * 'a stream
 
-  (* TODO: These names are awful. *)
   type ('a, 'b) stack =
     | Top
-    | Frame of ('a, 'b) frame * ('a, 'b) context
-  and ('a, 'b) frame = {
-    parent: ('a, 'b) stack;
-    stream: 'a stream
-  }
+    | Frame of ('a, 'b) stack * ('a, 'b) context
 
-  let rec tail_parse ~result rule ({parent; stream} as current_frame) =
+  let rec tail_parse ~result ~stream rule stack =
     match rule with
       | Eof f -> begin
         match stream with
-          | [] -> unwind parent (Success (f result, []))
-          | _  -> unwind parent Failure
+          | [] -> unwind stack (Success (f result, []))
+          | _  -> unwind stack Failure
       end
       | One (xs, f) -> begin
         match stream with
           | x :: stream' ->
             if List.mem x ~set:xs then
-              unwind parent (Success ((f result x), stream'))
+              unwind stack (Success ((f result x), stream'))
             else
-              unwind parent Failure
-          | [] -> unwind parent Failure
+              unwind stack Failure
+          | [] -> unwind stack Failure
       end
       | Seq (left, right) ->
-          let new_frame =
-            { parent = Frame (current_frame, Z_Seq right)
-            ; stream = stream }
-          in
-          tail_parse ~result left new_frame
+        tail_parse ~result ~stream left (Frame (stack, Z_Seq right))
       | Alt (left, right) ->
-          let new_frame =
-            { parent = Frame (current_frame, Z_Alt (right, result))
-            ; stream = stream }
-          in
-        tail_parse ~result left new_frame
-      | Bound (p, lower, upper) ->
-          let new_frame =
-            { parent = Frame (current_frame, Z_Bound (p, 0, lower, upper, result))
-            ; stream = stream }
-          in
-        tail_parse ~result p new_frame
+        let context = Z_Alt (right, result, stream) in
+        tail_parse ~result ~stream left (Frame (stack, context))
+      | Bound (rule, lower, upper) ->
+        let context = Z_Bound (rule, 1, lower, upper, result, stream) in
+        tail_parse ~result ~stream rule (Frame (stack, context))
   and unwind (* aka 'return' *) stack current_result =
     match stack with
       | Top -> current_result
-      | Frame (({parent; stream = saved_stream} as frame), context) ->
+      | Frame (parent, context) ->
         begin match context, current_result with
-          | Z_Seq right,  Success (result, stream) ->
-            let new_frame =
-              { parent = parent
-              ; stream = stream }
-            in
-            tail_parse ~result right new_frame
-          | Z_Seq _, Failure   -> unwind parent current_result
+          | Z_Seq right, Success (result, stream) ->
+            tail_parse ~result ~stream right parent
+          | Z_Seq _, Failure ->
+            unwind parent current_result
 
-          | Z_Alt (_right, _saved), Success _ -> unwind parent current_result
-          | Z_Alt (right, saved), Failure ->
-            let new_frame =
-              { parent = parent
-              ; stream = saved_stream }
-            in
-            tail_parse ~result:saved right new_frame
+          | Z_Alt (_right, _result, _stream), Success _ ->
+            unwind parent current_result
+          | Z_Alt (right, result, stream), Failure ->
+            tail_parse ~result ~stream right parent
 
-          | Z_Bound (p, n, lower, upper, saved), Success (result, stream) ->
+          | Z_Bound (rule, n, lower, upper, _result, _stream), Success (result, stream) ->
             let continue () =
-              let new_frame =
-                { parent = Frame (frame, Z_Bound (p, n+1, lower, upper, result))
-                ; stream = stream }
-              in tail_parse ~result p new_frame
+              let context = Z_Bound (rule, n+1, lower, upper, result, stream) in
+              tail_parse ~result ~stream rule (Frame (parent, context))
             in
             begin match upper with
               | None -> continue ()
               | Some m ->
-                if n = m then (* assumes n >= lower *)
-                  unwind parent current_result
-                else continue ()
+                if n < m then continue ()
+                else unwind parent current_result
             end
-          | Z_Bound (p, n, lower, upper, saved), Failure ->
-            if n >= lower then
-              unwind parent (Success (saved, saved_stream))
+          | Z_Bound (_rule, n, lower, _upper, result, stream), Failure ->
+            if n > lower then
+              unwind parent (Success (result, stream))
             else unwind parent current_result
         end
 
   let apply rule str =
     let init = "" in
     let stream = String.to_list str in
-    tail_parse ~result:init rule {parent = Top; stream}
+    tail_parse ~result:init ~stream rule Top
 end
