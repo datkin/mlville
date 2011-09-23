@@ -81,6 +81,7 @@ let apply rule str =
   parse rule "" (String.to_list str)
 ;;
 
+(* TODO: what to do about this. *)
 module Identity : sig
   type ('a, 'b) t
   val of_parser: ('a, 'b) parser -> ('a, 'b) t
@@ -108,8 +109,8 @@ module Tail = struct
 
   (* 'Z' for zipper. Perhaps 'F' would be better? *)
   type ('a, 'b) context =
-    | Z_Seq of ('a, 'b) parser option
-    | Z_Alt of ('a, 'b) parser option * 'b
+    | Z_Seq of ('a, 'b) parser
+    | Z_Alt of ('a, 'b) parser * 'b
     | Z_Bound of ('a, 'b) parser * int * int * int option * 'b
 
   (* TODO: These names are awful. *)
@@ -139,13 +140,13 @@ module Tail = struct
       end
       | Seq (left, right) ->
           let new_frame =
-            { parent = Frame (current_frame, Z_Seq (Some right))
+            { parent = Frame (current_frame, Z_Seq right)
             ; stream = stream }
           in
           tail_parse ~result left new_frame
       | Alt (left, right) ->
           let new_frame =
-            { parent = Frame (current_frame, Z_Alt (Some right, result))
+            { parent = Frame (current_frame, Z_Alt (right, result))
             ; stream = stream }
           in
         tail_parse ~result left new_frame
@@ -160,23 +161,21 @@ module Tail = struct
       | Top -> current_result
       | Frame (({parent; stream = saved_stream} as frame), context) ->
         begin match context, current_result with
-          | Z_Seq (Some right),  Success (result, stream) ->
+          | Z_Seq right,  Success (result, stream) ->
             let new_frame =
-              { parent = Frame (frame, Z_Seq None)
+              { parent = parent
               ; stream = stream }
             in
             tail_parse ~result right new_frame
-          | Z_Seq None, Success _ -> unwind parent current_result
-          | Z_Seq _,             Failure   -> unwind parent current_result
+          | Z_Seq _, Failure   -> unwind parent current_result
 
-          | Z_Alt (Some _right, _saved), Success _ -> unwind parent current_result
-          | Z_Alt (Some right, saved), Failure ->
+          | Z_Alt (_right, _saved), Success _ -> unwind parent current_result
+          | Z_Alt (right, saved), Failure ->
             let new_frame =
-              { parent = Frame (frame, Z_Alt (None, saved))
+              { parent = parent
               ; stream = saved_stream }
             in
             tail_parse ~result:saved right new_frame
-          | Z_Alt (None, _saved), _ -> unwind parent current_result
 
           | Z_Bound (p, n, lower, upper, saved), Success (result, stream) ->
             let continue () =
