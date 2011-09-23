@@ -1,10 +1,12 @@
-examples: examples.ml parser
-	ocamlfind ocamlc -package core -thread -linkpkg build/parser.cmo -I build examples.ml -annot -g -c -o build/examples
-	ocamlfind ocamlc -package core -thread -linkpkg -I build parser.cmo examples.cmo -o build/examples
+tests: test/test_parser.ml parser
+	mkdir -p build/tests
+	ocamlfind ocamlc -package core,ounit -thread -linkpkg -I build parser.cmo test/test_parser.ml -c -o build/tests/parser-tests
+	ocamlfind ocamlc -package core,ounit -thread -linkpkg -I build -I build/tests parser.cmo parser-tests.cmo -o build/tests/parser-tests
+	./build/tests/parser-tests
 
-parser: parser.ml init
-	ocamlfind ocamlc -package core -thread parser.mli -I build -linkpkg -annot -g -c -o build/parser
-	ocamlfind ocamlc -package core -thread parser.ml -I build -linkpkg -annot -g -c -o build/parser
+parser: src/parser.mli src/parser.ml init
+	ocamlfind ocamlc -package core -thread src/parser.mli -I build -linkpkg -annot -g -c -o build/parser
+	ocamlfind ocamlc -package core -thread src/parser.ml -I build -linkpkg -annot -g -c -o build/parser
 
 init:
 	mkdir -p build
