@@ -5,19 +5,19 @@
  * usually suffer high performance costs.
  *
  * I eventually intend to implement a robust and performant MLville compiler in
- * MLville itself. However, for the bootstrap compiling, performance is
- * secondary to simplicity and clarity (of course, reasonable performance is
- * appreciated). Thus, the aim here is to provide a small library for defining
- * and parsing grammars that distances the users from the usual -- painful --
- * extremes of parsing: tedious grammar tweaking, and awful performance. The
- * design and implementation of this library should inform the design of it's
- * eventual MLville counterpart, and has already provided insight to desirable
- * language features.
+ * MLville itself. However, for the bootstrap compiler, performance is secondary
+ * to simplicity and clarity (of course, reasonable performance is appreciated).
+ * Thus, the aim here is to provide a small library for defining and parsing
+ * grammars that distances the users from the usual -- painful -- extremes of
+ * parsing: tedious grammar tweaking, and awful performance. The design and
+ * implementation of this library should inform the design of its eventual
+ * MLville counterpart, and has already provided insight to desirable language
+ * features.
  *
  * Parsers are represented by an Algebraic Data Type, allowing for analysis to
  * facility both simplicity (e.g. for left recursion support) and performance
- * optimizations. Constructing parsers with combinators hides implementations
- * insides opaque structures (functions) and eliminates the possibility for any
+ * optimizations. Constructing parsers with combinators hides structural details
+ * inside opaque structures (functions) and eliminates the possibility for any
  * optimization outside the compiler itself. The parser type defined below is
  * extremely simple. It may be useful to provide combinator-style shorthands as
  * a convenient front-end for use when defining parsers. It may also be useful
