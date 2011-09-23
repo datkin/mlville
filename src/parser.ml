@@ -66,7 +66,7 @@ let rec parse rule result stream =
   | Bound (p, lower, upper) ->
     let rec iter result stream n =
       let over =
-        Option.value_map upper ~default:false ~f:(fun upper -> upper < n)
+        Option.value_map upper ~default:false ~f:(fun upper -> upper <= n)
       in
       if over then
         Success (result, stream)
@@ -236,7 +236,7 @@ module Tail = struct
         end
 
   let apply rule str =
-    let init = [] in
+    let init = "" in
     let stream = String.to_list str in
     tail_parse ~result:init (to_stack rule stream init)
 end
